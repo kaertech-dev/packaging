@@ -33,9 +33,9 @@ class ZPLPrinterGUI:
         
         self.insert_db = insertDatabaseHandler()
         self.root.title("Packaging")
-        self.root.geometry("650x750")
+        self.root.geometry("650x700")
         
-        self.center_window(650, 850)
+        self.center_window(650, 730)
 
         self.printer = PrinterHandler()
         self.db = DatabaseHandler()
@@ -275,7 +275,7 @@ class ZPLPrinterGUI:
         self.result_box.grid(row=1, column=0, columnspan=4, pady=5)
         self.write_to_result_box("→ Waiting for scan...\n")
 
-        # 🧾 LOG SECTION (CRITICAL - MUST BE OUTSIDE try/except!)
+        '''# 🧾 LOG SECTION (CRITICAL - MUST BE OUTSIDE try/except!)
         log_frame = ttk.LabelFrame(self.root, text="Log", padding=10)
         log_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
@@ -293,7 +293,7 @@ class ZPLPrinterGUI:
         add_tooltip(clear_log_btn, "Clear the log display")
 
         self.log_text = scrolledtext.ScrolledText(log_frame, height=6, width=70, state='disabled')
-        self.log_text.pack(fill="both", expand=True)
+        self.log_text.pack(fill="both", expand=True)'''
 
 # Add these new methods to handle dual printer connections:
     def start_new_batch(self):
@@ -502,9 +502,9 @@ class ZPLPrinterGUI:
                 self.outer_port_combo.current(0)
                 self.outer_port_combo.config(foreground="blue")
             
-            self.log(f"Found {len(ports)} port(s): {', '.join(ports)}")
+            '''self.log(f"Found {len(ports)} port(s): {', '.join(ports)}")
         else:
-            self.log("No COM ports found")
+            self.log("No COM ports found")'''
 
     def toggle_inner_connection(self):
         """Toggle connection for inner box printer"""
@@ -855,12 +855,19 @@ class ZPLPrinterGUI:
         self.log("Result box cleared")
 
     # ✅ NEW: Clear log method
-    def clear_log(self):
+    '''def clear_log(self):
         """Clear the log text box"""
         if messagebox.askyesno("Clear Log", "Are you sure you want to clear the log?"):
             self.log_text.config(state='normal')
             self.log_text.delete("1.0", tk.END)
             self.log_text.config(state='disabled')
+
+    def log(self, msg):
+        """Write to log (handles read-only state)"""
+        self.log_text.config(state='normal')
+        self.log_text.insert("end", f"{msg}\n")
+        self.log_text.see("end")
+        self.log_text.config(state='disabled')'''
 
     def logout(self):
         """Handle logout - confirm and return to login screen"""
@@ -868,13 +875,6 @@ class ZPLPrinterGUI:
             if self.printer.is_inner_connected() or self.printer.is_outer_connected():
                 self.printer.disconnect_all()
             self.logout_callback()
-
-    def log(self, msg):
-        """Write to log (handles read-only state)"""
-        self.log_text.config(state='normal')
-        self.log_text.insert("end", f"{msg}\n")
-        self.log_text.see("end")
-        self.log_text.config(state='disabled')
 
     def on_closing(self):
         if self.printer.is_inner_connected() or self.printer.is_outer_connected():
