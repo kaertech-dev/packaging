@@ -1,0 +1,3 @@
+serial_num,po_num,operator_en,shift,date_time,mac_address,rssi,test_rep,remarks,status
+K12345678901,1,ke0099,A,2025-10-20 10:53:08,010000FEF214,-58,1,DB_INSERT_ERROR: 1142 (42000): UPDATE command denied to user 'labeling'@'192.168.0.12' for table 'mainboard_main',0
+K12345678901,123,KE0099,A,2025-10-20 10:56:43,010000FEF214,-75,1,scannable,1

@@ -1,0 +1,135 @@
+# PACKAGING/database_handler.py
+import mysql.connector
+from datetime import datetime
+from tkinter import messagebox
+
+class DatabaseHandler:
+    def __init__(self):
+        self.config = {
+            'host': '192.168.1.38',
+            'user': 'testing',
+            'password': 'testing',
+            'database': 'ledtech'
+        }
+
+    def get_batch_and_po(self, serial_num):
+        """Fetch batch_code and po_num from faceware_assembly1 if serial exists."""
+        try:
+            db = mysql.connector.connect(**self.config)
+            cursor = db.cursor()
+            cursor.execute("SELECT batch_code, po_num FROM faceware_assembly1 WHERE serial_num = %s", (serial_num,))
+            result = cursor.fetchone()
+            cursor.close()
+            db.close()
+            if result:
+                return result[0], result[1]
+            else:
+                return None, None
+        except mysql.connector.Error as err:
+            print(f"[DB ERROR] {err}")
+            return None, None
+
+class insertDatabaseHandler:
+    def __init__(self):
+        self.config = {
+            'host': '192.168.1.38',
+            'user': 'labeling',
+            'password': 'labeling',
+            'database': 'ledtech'
+        }
+
+    def record_operator_activity(self, operator, shift, serial_num, batch_code, po_num, 
+                                 ship_mode, innerbox, outerbox, pallet_num):
+        """Insert operator data with box counting information.
+           Checks if serial_num passed all production stations before packaging.
+        """
+        try:
+            db = mysql.connector.connect(**self.config)
+            cursor = db.cursor(dictionary=True)
+
+            # ✅ Step 1: Verify serial exists in faceware_main
+            cursor.execute("SELECT * FROM faceware_main WHERE serial_num = %s", (serial_num,))
+            main_data = cursor.fetchone()
+
+            if not main_data:
+                messagebox.showwarning("Invalid Serial", f"❌ Serial '{serial_num}' not found in faceware_main.")
+                print(f"[DB] Serial {serial_num} not found in faceware_main. Skipping insert.")
+                cursor.close()
+                db.close()
+                return False
+
+            # ✅ Step 2: Verify that all required stations have status = 1
+            required_stations = [
+                "assembly1", "lasermarking1",
+                "assembly2", "soldering2", "vi2", "assembly3",
+                "assembly4", "vi3", "finaltest", "assembly5",
+                "packing", "lasermarking2", "fvi"
+            ]
+
+            incomplete_stations = [
+                s for s in required_stations
+                if s not in main_data or main_data[s] != 1
+            ]
+
+            if incomplete_stations:
+                first_incomplete = incomplete_stations[0]
+                messagebox.showwarning(
+                    "Incomplete Process",
+                    f"⚠️ Serial '{serial_num}' cannot proceed to packaging.\n"
+                    f"Please complete '{first_incomplete.upper()}' station first."
+                )
+                print(f"[DB] Serial {serial_num} blocked at {first_incomplete}. Status check failed.")
+                cursor.close()
+                db.close()
+                return False
+
+            # ✅ Step 3: Get batch_code & PO if not provided
+            if not batch_code or not po_num:
+                cursor.execute("SELECT batch_code, po_num FROM faceware_assembly1 WHERE serial_num = %s", (serial_num,))
+                assembly_data = cursor.fetchone()
+                if assembly_data:
+                    batch_code, po_num = assembly_data["batch_code"], assembly_data["po_num"]
+                else:
+                    messagebox.showwarning("Missing Data", f"⚠️ Serial '{serial_num}' not found in assembly1 table.")
+                    cursor.close()
+                    db.close()
+                    return False
+
+            # ✅ Step 4: Prevent duplicate packaging entries
+            check_query = """
+                SELECT COUNT(*) AS cnt FROM faceware_packaging 
+                WHERE serial_num = %s AND po_num = %s AND batch_code = %s
+            """
+            cursor.execute(check_query, (serial_num, po_num, batch_code))
+            if cursor.fetchone()["cnt"] > 0:
+                messagebox.showinfo("Duplicate Detected", f"⚠️ Serial '{serial_num}' already recorded in packaging.")
+                print(f"[DB] Duplicate detected → Serial {serial_num} already exists. Skipping insert.")
+                cursor.close()
+                db.close()
+                return False
+
+            # ✅ Step 5: Insert new packaging record
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            insert_query = """
+                INSERT INTO faceware_packaging 
+                (serial_num, po_num, operator_en, shift, date_time, sku, batch_code, 
+                 ship_mode, innerbox, outerbox, pallet_num)
+                VALUES (%s, %s, %s, %s, %s, 43000166102, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(insert_query, (
+                serial_num, po_num, operator, shift, now,
+                batch_code, ship_mode, innerbox, outerbox, pallet_num
+            ))
+            db.commit()
+
+            print(f"[DB] ✅ Recorded: Serial {serial_num} | "
+                  f"Innerbox {innerbox} | Outerbox {outerbox} | Pallet {pallet_num}")
+
+            cursor.close()
+            db.close()
+            return True
+
+        except mysql.connector.Error as err:
+            print(f"[DB ERROR] {err}")
+            messagebox.showerror("Database Error", f"⚠️ Database error occurred:\n{err}")
+            return False
