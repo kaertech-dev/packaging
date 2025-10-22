@@ -25,7 +25,7 @@ class ZPLPrinterGUI:
         self.innerboxes_per_outerbox = 5
         
         # ✅ NEW: Batch code lock for pallet
-        self.current_pallet_batch_code = None  # Locked batch code for current pallet
+        self.current_pallet_batch_code = None
         
         self.box_dropdown = None
         self.box_count_frame = None
@@ -42,8 +42,8 @@ class ZPLPrinterGUI:
 
         apply_widget_styles()
 
-        self.create_widgets()
-        self.refresh_ports()
+        self.create_widgets()      # ← CREATE WIDGETS FIRST (line 45)
+        self.refresh_ports()       # ← THEN REFRESH PORTS (line 46) ❌ THIS IS THE PROBLEM
         self.create_box_dropdown()
         
         self.box_count_var.trace("w", lambda *args: self.update_pallet_capacity())
@@ -63,43 +63,74 @@ class ZPLPrinterGUI:
         conn_frame = ttk.LabelFrame(self.root, text="Printer Connection", padding=10)
         conn_frame.pack(fill="x", padx=10, pady=5)
 
-        # --- LEFT SIDE: Printer Controls ---
+        # --- LEFT SIDE: Printer Controls (Stacked Vertically) ---
         left_conn = ttk.Frame(conn_frame)
-        left_conn.pack(side="left", anchor="w", padx=5, pady=5)
+        left_conn.pack(side="left", anchor="nw", padx=5, pady=5)
 
-        ttk.Label(left_conn, text="COM Port:").grid(row=0, column=0, sticky="w", padx=5)
-        self.port_combo = ttk.Combobox(left_conn, width=15, state="readonly")
-        self.port_combo.grid(row=0, column=1, padx=5)
+        # Inner Printer Section (TOP)
+        inner_frame = ttk.LabelFrame(left_conn, text="Inner Box Printer", padding=8)
+        inner_frame.pack(fill="x", pady=(0, 10))
+        
+        ttk.Label(inner_frame, text="COM Port:").grid(row=0, column=0, sticky="w", padx=5, pady=3)
+        self.inner_port_combo = ttk.Combobox(inner_frame, width=15, state="readonly")
+        self.inner_port_combo.grid(row=0, column=1, padx=5, pady=3)
 
-        ttk.Button(
-            left_conn,
-            text="Refresh",
-            command=self.refresh_ports,
-            style="Refresh.TButton"
-        ).grid(row=0, column=2, padx=5)
-
-        ttk.Label(left_conn, text="Baud Rate:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
-        self.baud_combo = ttk.Combobox(
-            left_conn,
+        ttk.Label(inner_frame, text="Baud Rate:").grid(row=1, column=0, sticky="w", padx=5, pady=3)
+        self.inner_baud_combo = ttk.Combobox(
+            inner_frame,
             width=15,
             state="readonly",
             values=["9600", "19200", "38400", "57600", "115200"]
         )
-        self.baud_combo.set("9600")
-        self.baud_combo.grid(row=1, column=1, padx=5, pady=5)
+        self.inner_baud_combo.set("9600")
+        self.inner_baud_combo.grid(row=1, column=1, padx=5, pady=3)
+
+        self.inner_status_label = ttk.Label(inner_frame, text="Status: Disconnected", foreground="red")
+        self.inner_status_label.grid(row=2, column=0, columnspan=2, pady=3)
+
+        # Outer Printer Section (BELOW INNER)
+        outer_frame = ttk.LabelFrame(left_conn, text="Outer Box Printer", padding=8)
+        outer_frame.pack(fill="x", pady=(0, 10))
+        
+        ttk.Label(outer_frame, text="COM Port:").grid(row=0, column=0, sticky="w", padx=5, pady=3)
+        self.outer_port_combo = ttk.Combobox(outer_frame, width=15, state="readonly")
+        self.outer_port_combo.grid(row=0, column=1, padx=5, pady=3)
+
+        ttk.Label(outer_frame, text="Baud Rate:").grid(row=1, column=0, sticky="w", padx=5, pady=3)
+        self.outer_baud_combo = ttk.Combobox(
+            outer_frame,
+            width=15,
+            state="readonly",
+            values=["9600", "19200", "38400", "57600", "115200"]
+        )
+        self.outer_baud_combo.set("9600")
+        self.outer_baud_combo.grid(row=1, column=1, padx=5, pady=3)
+
+        self.outer_status_label = ttk.Label(outer_frame, text="Status: Disconnected", foreground="red")
+        self.outer_status_label.grid(row=2, column=0, columnspan=2, pady=3)
+
+        # Control Buttons (Below both printer sections)
+        button_frame = ttk.Frame(left_conn)
+        button_frame.pack(fill="x")
+
+        ttk.Button(
+            button_frame,
+            text="Refresh Ports",
+            command=self.refresh_ports,
+            style="Refresh.TButton",
+            width=20
+        ).pack(pady=3)
 
         self.connect_btn = ttk.Button(
-            left_conn,
-            text="Connect",
+            button_frame,
+            text="Connect Both",
             command=self.toggle_connection,
-            style="Connect.TButton"
+            style="Connect.TButton",
+            width=20
         )
-        self.connect_btn.grid(row=1, column=2, padx=5, pady=5)
+        self.connect_btn.pack(pady=3)
 
-        self.status_label = ttk.Label(left_conn, text="Status: Disconnected", foreground="red")
-        self.status_label.grid(row=2, column=0, columnspan=3, pady=5)
-
-        # --- RIGHT SIDE: Logo + User Info + Logout ---
+        # --- RIGHT SIDE: Logo + User Info + Logout + Pallet Progress ---
         right_conn = ttk.Frame(conn_frame)
         right_conn.pack(side="right", anchor="ne", padx=(0, 10), pady=(10, 0))
 
@@ -110,7 +141,7 @@ class ZPLPrinterGUI:
             self.logo_photo = ImageTk.PhotoImage(logo_image)
 
             info_frame = ttk.Frame(right_conn)
-            info_frame.pack(side="right", anchor="ne", fill="x")
+            info_frame.pack(side="top", anchor="ne", fill="x")
 
             logo_border = tk.Frame(
                 info_frame,
@@ -155,59 +186,61 @@ class ZPLPrinterGUI:
         except Exception as e:
             print(f"Image load error: {e}")
 
-        # 🪜 PALLET PROGRESS SECTION
-        self.progress_frame = ttk.LabelFrame(self.root, text="Pallet Progress", padding=10)
-        self.progress_frame.pack(fill="x", padx=10, pady=5)
+        # 🪜 PALLET PROGRESS SECTION (BELOW USER INFO)
+        self.progress_frame = ttk.LabelFrame(right_conn, text="Pallet Progress", padding=10)
+        self.progress_frame.pack(fill="both", expand=True, pady=(10, 0))
 
         self.pallet_label = ttk.Label(
             self.progress_frame,
             text="Current Pallet: 1",
-            font=("Arial", 12, "bold")
+            font=("Arial", 11, "bold")
         )
-        self.pallet_label.grid(row=0, column=0, padx=10, pady=5)
+        self.pallet_label.pack(pady=(5, 2))
 
         self.unit_label = ttk.Label(
             self.progress_frame,
             text="Units: 0 / 0",
-            font=("Arial", 12)
+            font=("Arial", 10)
         )
-        self.unit_label.grid(row=0, column=1, padx=10, pady=5)
+        self.unit_label.pack(pady=2)
 
         # ✅ Batch code display with clear button
         batch_frame = ttk.Frame(self.progress_frame)
-        batch_frame.grid(row=1, column=0, columnspan=2, pady=2)
+        batch_frame.pack(pady=5)
         
         self.batch_label = ttk.Label(
             batch_frame,
             text="Batch Code: Not Set",
-            font=("Arial", 10),
+            font=("Arial", 9),
             foreground="orange"
         )
-        self.batch_label.pack(side="left", padx=(0, 10))
+        self.batch_label.pack(pady=2)
+        
+        button_row1 = ttk.Frame(batch_frame)
+        button_row1.pack(pady=2)
         
         clear_batch_btn = ttk.Button(
-            batch_frame,
+            button_row1,
             text="Clear Batch",
             command=self.clear_batch_code,
             style="Refresh.TButton",
             width=12
         )
-        clear_batch_btn.pack(side="left", padx=5)
+        clear_batch_btn.pack(side="left", padx=2)
         add_tooltip(clear_batch_btn, "Clear the current pallet batch code lock")
 
-        # ✅ NEW: "New Batch Code" button
         self.new_batch_btn = ttk.Button(
-            batch_frame,
+            button_row1,
             text="New Batch Code",
             command=self.start_new_batch,
             style="Connect.TButton",
-            width=15
+            width=13
         )
-        self.new_batch_btn.pack(side="left", padx=5)
+        self.new_batch_btn.pack(side="left", padx=2)
         add_tooltip(self.new_batch_btn, "Finish current batch and start new one with different batch code")
 
-        self.progress_bar = ttk.Progressbar(self.progress_frame, length=400, mode='determinate')
-        self.progress_bar.grid(row=2, column=0, columnspan=2, pady=5)
+        self.progress_bar = ttk.Progressbar(self.progress_frame, length=250, mode='determinate')
+        self.progress_bar.pack(pady=(5, 10))
 
         # 📦 BARCODE SCANNING SECTION
         scan_frame = ttk.LabelFrame(self.root, text="Barcode Scanning", padding=10)
@@ -242,7 +275,7 @@ class ZPLPrinterGUI:
         self.result_box.grid(row=1, column=0, columnspan=4, pady=5)
         self.write_to_result_box("→ Waiting for scan...\n")
 
-        # 🧾 LOG SECTION
+        # 🧾 LOG SECTION (CRITICAL - MUST BE OUTSIDE try/except!)
         log_frame = ttk.LabelFrame(self.root, text="Log", padding=10)
         log_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
@@ -262,6 +295,7 @@ class ZPLPrinterGUI:
         self.log_text = scrolledtext.ScrolledText(log_frame, height=6, width=70, state='disabled')
         self.log_text.pack(fill="both", expand=True)
 
+# Add these new methods to handle dual printer connections:
     def start_new_batch(self):
         """Start a new batch code - return to shipping mode selection"""
         if self.current_pallet_batch_code is None:
@@ -450,32 +484,138 @@ class ZPLPrinterGUI:
             )
         
         self.update_progress_display()
-
+ 
     def refresh_ports(self):
+        """Refresh available COM ports for both printers"""
         ports = self.printer.list_ports()
-        self.port_combo['values'] = ports
+        self.inner_port_combo['values'] = ports
+        self.outer_port_combo['values'] = ports
+        
         if ports:
-            self.port_combo.current(0)
-            self.port_combo.config(foreground="blue")
-            self.log(f"Found {len(ports)} port(s)")
+            if len(ports) > 0:
+                self.inner_port_combo.current(0)
+                self.inner_port_combo.config(foreground="blue")
+            if len(ports) > 1:
+                self.outer_port_combo.current(1)
+                self.outer_port_combo.config(foreground="blue")
+            elif len(ports) == 1:
+                self.outer_port_combo.current(0)
+                self.outer_port_combo.config(foreground="blue")
+            
+            self.log(f"Found {len(ports)} port(s): {', '.join(ports)}")
         else:
             self.log("No COM ports found")
 
-    def toggle_connection(self):
-        if self.printer.is_connected():
-            self.printer.disconnect()
-            self.status_label.config(text="Status: Disconnected", foreground="red")
-            self.connect_btn.config(text="Connect", style="Connect.TButton")
-            self.log("Disconnected from printer")
+    def toggle_inner_connection(self):
+        """Toggle connection for inner box printer"""
+        if self.printer.is_inner_connected():
+            self.printer.disconnect_inner()
+            self.inner_status_label.config(text="Status: Disconnected", foreground="red")
+            self.inner_connect_btn.config(text="Connect", style="Connect.TButton")
+            self.log("Disconnected from inner box printer")
         else:
-            port = self.port_combo.get()
-            baud = int(self.baud_combo.get())
-            if self.printer.connect(port, baud):
-                self.status_label.config(text=f"Status: Connected to {port}", foreground="green")
-                self.connect_btn.config(text="Disconnect", style="Disconnect.TButton")
-                self.log(f"Connected to {port}")
+            port = self.inner_port_combo.get()
+            if not port:
+                messagebox.showwarning("No Port Selected", "Please select a COM port for inner printer.")
+                return
+            
+            baud = int(self.inner_baud_combo.get())
+            if self.printer.connect_inner(port, baud):
+                self.inner_status_label.config(text=f"Status: Connected to {port}", foreground="green")
+                self.inner_connect_btn.config(text="Disconnect", style="Disconnect.TButton")
+                self.log(f"Inner box printer connected to {port}")
             else:
-                messagebox.showerror("Connection Error", "Failed to connect to printer")
+                messagebox.showerror("Connection Error", f"Failed to connect to inner printer on {port}")
+
+    def toggle_outer_connection(self):
+        """Toggle connection for outer box printer"""
+        if self.printer.is_outer_connected():
+            self.printer.disconnect_outer()
+            self.outer_status_label.config(text="Status: Disconnected", foreground="red")
+            self.outer_connect_btn.config(text="Connect", style="Connect.TButton")
+            self.log("Disconnected from outer box printer")
+        else:
+            port = self.outer_port_combo.get()
+            if not port:
+                messagebox.showwarning("No Port Selected", "Please select a COM port for outer printer.")
+                return
+            
+            baud = int(self.outer_baud_combo.get())
+            if self.printer.connect_outer(port, baud):
+                self.outer_status_label.config(text=f"Status: Connected to {port}", foreground="green")
+                self.outer_connect_btn.config(text="Disconnect", style="Disconnect.TButton")
+                self.log(f"Outer box printer connected to {port}")
+            else:
+                messagebox.showerror("Connection Error", f"Failed to connect to outer printer on {port}")
+                
+    def toggle_connection(self):
+        """Toggle connection for BOTH printers at once"""
+        # Check if either printer is connected
+        if self.printer.is_inner_connected() or self.printer.is_outer_connected():
+            # Disconnect both
+            self.printer.disconnect_all()
+            self.inner_status_label.config(text="Status: Disconnected", foreground="red")
+            self.outer_status_label.config(text="Status: Disconnected", foreground="red")
+            self.connect_btn.config(text="Connect Both", style="Connect.TButton")
+            self.log("🔌 Disconnected from both printers")
+        else:
+            # Connect both
+            inner_port = self.inner_port_combo.get()
+            outer_port = self.outer_port_combo.get()
+            
+            if not inner_port or not outer_port:
+                messagebox.showwarning("No Port Selected", 
+                    "Please select COM ports for both printers.\n\n"
+                    "Inner Printer: Select port for innerbox labels\n"
+                    "Outer Printer: Select port for outerbox labels")
+                return
+            
+            if inner_port == outer_port:
+                messagebox.showerror("Same Port Selected", 
+                    "Inner and Outer printers cannot use the same COM port!\n"
+                    "Please select different ports for each printer.")
+                return
+            
+            inner_baud = int(self.inner_baud_combo.get())
+            outer_baud = int(self.outer_baud_combo.get())
+            
+            # Try to connect both
+            inner_success = self.printer.connect_inner(inner_port, inner_baud)
+            outer_success = self.printer.connect_outer(outer_port, outer_baud)
+            
+            # Update status labels
+            if inner_success:
+                self.inner_status_label.config(text=f"Status: Connected to {inner_port}", foreground="green")
+                self.log(f"📦 Inner box printer connected to {inner_port}")
+            else:
+                self.inner_status_label.config(text="Status: Connection Failed", foreground="red")
+                self.log(f"❌ Failed to connect inner printer to {inner_port}")
+            
+            if outer_success:
+                self.outer_status_label.config(text=f"Status: Connected to {outer_port}", foreground="green")
+                self.log(f"📦 Outer box printer connected to {outer_port}")
+            else:
+                self.outer_status_label.config(text="Status: Connection Failed", foreground="red")
+                self.log(f"❌ Failed to connect outer printer to {outer_port}")
+            
+            # Update button based on results
+            if inner_success and outer_success:
+                self.connect_btn.config(text="Disconnect Both", style="Disconnect.TButton")
+                messagebox.showinfo("Success", 
+                    f"✅ Both printers connected successfully!\n\n"
+                    f"Inner Printer: {inner_port}\n"
+                    f"Outer Printer: {outer_port}")
+            elif inner_success or outer_success:
+                self.connect_btn.config(text="Disconnect Both", style="Disconnect.TButton")
+                messagebox.showwarning("Partial Connection", 
+                    f"⚠️ Only one printer connected successfully.\n\n"
+                    f"Inner Printer: {'✅ Connected' if inner_success else '❌ Failed'}\n"
+                    f"Outer Printer: {'✅ Connected' if outer_success else '❌ Failed'}\n\n"
+                    f"Check your COM port settings and try again.")
+            else:
+                messagebox.showerror("Connection Failed", 
+                    "❌ Failed to connect both printers.\n"
+                    "Please check your COM port settings and try again.")
 
     def clear_batch_code(self):
         """Clear the current pallet batch code lock"""
@@ -539,6 +679,8 @@ class ZPLPrinterGUI:
         self.check_serial_in_db()
         return "break"
     
+    # Update the check_serial_in_db method to use the correct printers:
+
     def check_serial_in_db(self):
         serial_num = self.serial_entry.get().strip()
         if not serial_num:
@@ -611,28 +753,45 @@ class ZPLPrinterGUI:
         self.unit_count += 1
         self.update_progress_display()
         
-        if not self.printer.is_connected():
-            messagebox.showwarning("Printer Not Connected", "Connect to printer before scanning.")
+        # Check printer connections
+        if not self.printer.is_inner_connected() and not self.printer.is_outer_connected():
+            messagebox.showwarning("Printers Not Connected", "Connect to printers before scanning.")
             self.serial_entry.delete(0, tk.END)
             self.serial_entry.focus()
             return
 
+        # Print innerbox label when needed
         if self.unit_count % self.units_per_innerbox == 0:
-            sku = "43000166102"
-            barcode = f"{batch_code}-IB{current_innerbox:03d}"
-            quantity = self.units_per_innerbox
-            lot = batch_code
-            innerbox_zpl = inner_zpl(sku, barcode, quantity, lot)
-            self.printer.send_to_printer(innerbox_zpl)
-            self.log(f"📦 INNERBOX #{current_innerbox} label printed (Outerbox {current_outerbox})")
+            if not self.printer.is_inner_connected():
+                messagebox.showwarning("Inner Printer Not Connected", 
+                    "Inner box printer is not connected. Label not printed.")
+            else:
+                sku = "43000166102"
+                barcode = f"{batch_code}-IB{current_innerbox:03d}"
+                quantity = self.units_per_innerbox
+                lot = batch_code
+                innerbox_zpl = inner_zpl(sku, barcode, quantity, lot)
+                
+                if self.printer.send_to_inner_printer(innerbox_zpl):
+                    self.log(f"📦 INNERBOX #{current_innerbox} label printed (Outerbox {current_outerbox})")
+                else:
+                    self.log(f"❌ Failed to print INNERBOX #{current_innerbox} label")
         
+        # Print outerbox label when needed
         if self.unit_count % (self.units_per_innerbox * self.innerboxes_per_outerbox) == 0:
-            sku = "43000166102"
-            lot_code = batch_code
-            quantity = self.innerboxes_per_outerbox * self.units_per_innerbox
-            outerbox_zpl_data = outer_zpl(sku, lot_code, quantity, current_outerbox)
-            self.printer.send_to_printer(outerbox_zpl_data)
-            self.log(f"📦📦 OUTERBOX #{current_outerbox} label printed")
+            if not self.printer.is_outer_connected():
+                messagebox.showwarning("Outer Printer Not Connected", 
+                    "Outer box printer is not connected. Label not printed.")
+            else:
+                sku = "43000166102"
+                lot_code = batch_code
+                quantity = self.innerboxes_per_outerbox * self.units_per_innerbox
+                outerbox_zpl_data = outer_zpl(sku, lot_code, quantity, current_outerbox)
+                
+                if self.printer.send_to_outer_printer(outerbox_zpl_data):
+                    self.log(f"📦📦 OUTERBOX #{current_outerbox} label printed")
+                else:
+                    self.log(f"❌ Failed to print OUTERBOX #{current_outerbox} label")
 
         if self.unit_count >= self.total_units_per_pallet:
             messagebox.showinfo("Pallet Complete", 
@@ -706,8 +865,8 @@ class ZPLPrinterGUI:
     def logout(self):
         """Handle logout - confirm and return to login screen"""
         if messagebox.askyesno("Logout", "Are you sure you want to logout?"):
-            if self.printer.is_connected():
-                self.printer.disconnect()
+            if self.printer.is_inner_connected() or self.printer.is_outer_connected():
+                self.printer.disconnect_all()
             self.logout_callback()
 
     def log(self, msg):
@@ -718,6 +877,6 @@ class ZPLPrinterGUI:
         self.log_text.config(state='disabled')
 
     def on_closing(self):
-        if self.printer.is_connected():
-            self.printer.disconnect()
+        if self.printer.is_inner_connected() or self.printer.is_outer_connected():
+            self.printer.disconnect_all()
         self.root.destroy()
