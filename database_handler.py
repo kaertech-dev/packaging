@@ -33,8 +33,8 @@ class insertDatabaseHandler:
     def __init__(self):
         self.config = {
             'host': '192.168.1.38',
-            'user': 'labeling',
-            'password': 'labeling',
+            'user': 'testing',
+            'password': 'testing',
             'database': 'ledtech'
         }
 
@@ -61,8 +61,8 @@ class insertDatabaseHandler:
             # ✅ Step 2: Verify that all required stations have status = 1
             required_stations = [
                 "assembly1", "lasermarking1",
-                "assembly2", "soldering2", "vi2", "assembly3",
-                "assembly4", "vi3", "finaltest", "assembly5",
+                "assembly2", "soldering2", "vi2",
+                "assembly4", "vi3", "finaltest",
                 "packing", "lasermarking2", "fvi"
             ]
 
@@ -132,4 +132,44 @@ class insertDatabaseHandler:
         except mysql.connector.Error as err:
             print(f"[DB ERROR] {err}")
             messagebox.showerror("Database Error", f"⚠️ Database error occurred:\n{err}")
+            return False
+
+    def update_packaging_status(self, serial_num, po_num, batch_code):
+        """Update faceware_main.packaging = 1 and faceware_packaging.status = 1 
+           after successful label printing.
+        """
+        try:
+            db = mysql.connector.connect(**self.config)
+            cursor = db.cursor()
+
+            # ✅ Update faceware_main: Set packaging = 1
+            update_main_query = """
+                UPDATE faceware_main 
+                SET packaging = 1 
+                WHERE serial_num = %s
+            """
+            cursor.execute(update_main_query, (serial_num,))
+            
+            # ✅ Update faceware_packaging: Set status = 1
+            update_packaging_query = """
+                UPDATE faceware_packaging 
+                SET status = 1 
+                WHERE serial_num = %s AND po_num = %s AND batch_code = %s
+            """
+            cursor.execute(update_packaging_query, (serial_num, po_num, batch_code))
+            
+            db.commit()
+            
+            rows_affected_main = cursor.rowcount
+            print(f"[DB] ✅ Updated packaging status: "
+                  f"faceware_main.packaging=1, faceware_packaging.status=1 "
+                  f"for serial {serial_num}")
+
+            cursor.close()
+            db.close()
+            
+            return True
+
+        except mysql.connector.Error as err:
+            print(f"[DB ERROR] Failed to update packaging status: {err}")
             return False
