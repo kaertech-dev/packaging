@@ -36,8 +36,8 @@ class ZPLPrinterGUI:
         
         self.insert_db = insertDatabaseHandler()
         self.root.title("Packaging")
-        self.root.geometry("650x700")
-        self.center_window(650, 730)
+        self.root.geometry("650x950")
+        self.center_window(650, 950)
         self.printer = PrinterHandler()
         self.db = DatabaseHandler()
         self.check_serial_in_db = MethodType(check_serial_in_db, self)
