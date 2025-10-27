@@ -152,6 +152,16 @@ def create_widgets(self):
         )
         self.unit_label.pack(pady=2)
 
+        # ✅ NEW: Database batch count display
+        self.batch_count_label = ttk.Label(
+            self.progress_frame,
+            text="DB Batch Count: --",
+            font=("Arial", 9),
+            foreground="#0066CC"
+        )
+        self.batch_count_label.pack(pady=2)
+        add_tooltip(self.batch_count_label, "Total units already packaged for current batch code in database")
+
         # ✅ Batch code display with clear button
         batch_frame = ttk.Frame(self.progress_frame)
         batch_frame.pack(pady=5)
@@ -186,6 +196,17 @@ def create_widgets(self):
         )
         self.new_batch_btn.pack(side="left", padx=2)
         add_tooltip(self.new_batch_btn, "Finish current batch and start new one with different batch code")
+
+        # ✅ NEW: Refresh batch count button
+        refresh_batch_btn = ttk.Button(
+            batch_frame,
+            text="🔄 Refresh Batch Count",
+            command=self.refresh_batch_count,
+            style="Refresh.TButton",
+            width=20
+        )
+        refresh_batch_btn.pack(pady=2)
+        add_tooltip(refresh_batch_btn, "Manually refresh the database batch count")
 
         self.progress_bar = ttk.Progressbar(self.progress_frame, length=250, mode='determinate')
         self.progress_bar.pack(pady=(5, 10))

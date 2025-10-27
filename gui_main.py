@@ -10,6 +10,7 @@ from gui_main_widget import create_widgets
 from select_shipping_mode_ui import show_ship_mode_dialog
 from check_serial_in_database import check_serial_in_db
 from types import MethodType
+
 class ZPLPrinterGUI:
     def __init__(self, root, username, serial_num, po_num, shift, ship_mode, logout_callback):
         self.root = root
@@ -42,8 +43,8 @@ class ZPLPrinterGUI:
         self.db = DatabaseHandler()
         self.check_serial_in_db = MethodType(check_serial_in_db, self)
         apply_widget_styles()
-        create_widgets(self)      # ← CREATE WIDGETS FIRST (line 45)
-        self.refresh_ports()       # ← THEN REFRESH PORTS (line 46) ❌ THIS IS THE PROBLEM
+        create_widgets(self)
+        self.refresh_ports()
         self.create_box_dropdown()
         self.box_count_var.trace("w", lambda *args: self.update_pallet_capacity())
 
@@ -413,7 +414,64 @@ class ZPLPrinterGUI:
         else:
             self.progress_bar['value'] = 0
 
-    # ✅ NEW: Helper method to write to result box (handles read-only state)
+    # 🆕 NEW METHODS - ADD THESE TWO METHODS HERE
+    def refresh_batch_count(self):
+        """Manually refresh the database batch count display"""
+        if self.current_pallet_batch_code is None:
+            messagebox.showinfo(
+                "No Batch Code",
+                "No batch code is currently set.\n"
+                "Scan an item to set a batch code first."
+            )
+            return
+        
+        # Fetch count from database
+        existing_count = self.insert_db.get_batch_unit_count(
+            self.current_pallet_batch_code, 
+            self.po_num
+        )
+        
+        # Update display
+        self.batch_count_label.config(
+            text=f"DB Batch Count: {existing_count} units",
+            foreground="#0066CC"
+        )
+        
+        self.log(f"🔄 Manual refresh: Batch '{self.current_pallet_batch_code}' has {existing_count} units in database")
+        
+        messagebox.showinfo(
+            "Batch Count Refreshed",
+            f"✅ Database Count Updated\n\n"
+            f"Batch Code: {self.current_pallet_batch_code}\n"
+            f"Total Units in DB: {existing_count}"
+        )
+
+    def update_batch_count_display(self, batch_code=None, po_num=None):
+        """Update the batch count label with database count"""
+        if batch_code is None:
+            batch_code = self.current_pallet_batch_code
+        if po_num is None:
+            po_num = self.po_num
+            
+        if batch_code is None:
+            self.batch_count_label.config(
+                text="DB Batch Count: --",
+                foreground="gray"
+            )
+            return
+        
+        # Fetch current count from database
+        existing_count = self.insert_db.get_batch_unit_count(batch_code, po_num)
+        
+        # Update label
+        self.batch_count_label.config(
+            text=f"DB Batch Count: {existing_count} units",
+            foreground="#0066CC"
+        )
+        
+        self.log(f"📊 Batch count display updated: {existing_count} units for batch '{batch_code}'")
+
+    # ✅ EXISTING METHODS CONTINUE BELOW
     def write_to_result_box(self, text):
         """Write text to the result box (handles read-only state)"""
         self.result_box.config(state='normal')
@@ -421,7 +479,6 @@ class ZPLPrinterGUI:
         self.result_box.see("end")
         self.result_box.config(state='disabled')
 
-    # ✅ NEW: Clear result box method
     def clear_result_box(self):
         """Clear the barcode scanning result box"""
         self.result_box.config(state='normal')
@@ -430,7 +487,6 @@ class ZPLPrinterGUI:
         self.result_box.config(state='disabled')
         self.log("Result box cleared")
 
-    # ✅ NEW: Clear log method
     def clear_log(self):
         """Clear the log text box"""
         if messagebox.askyesno("Clear Log", "Are you sure you want to clear the log?"):

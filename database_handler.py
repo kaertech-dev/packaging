@@ -173,3 +173,63 @@ class insertDatabaseHandler:
         except mysql.connector.Error as err:
             print(f"[DB ERROR] Failed to update packaging status: {err}")
             return False
+    def check_existing_packaging(self, serial_num, po_num, batch_code):
+        """Check if serial_num already exists in faceware_packaging.
+           Returns packaging data if found, None otherwise.
+        """
+        try:
+            db = mysql.connector.connect(**self.config)
+            cursor = db.cursor(dictionary=True)
+            
+            query = """
+                SELECT serial_num, batch_code, innerbox, outerbox, pallet_num, operator_en, date_time
+                FROM faceware_packaging 
+                WHERE serial_num = %s AND po_num = %s AND batch_code = %s
+                LIMIT 1
+            """
+            cursor.execute(query, (serial_num, po_num, batch_code))
+            result = cursor.fetchone()
+            
+            cursor.close()
+            db.close()
+            
+            if result:
+                print(f"[DB] ✅ Found existing packaging record for serial {serial_num}")
+                return result
+            else:
+                return None
+                
+        except mysql.connector.Error as err:
+            print(f"[DB ERROR] Failed to check existing packaging: {err}")
+            return None
+
+    def get_batch_unit_count(self, batch_code, po_num):
+        """Count how many units have already been packaged for this batch code.
+           This prevents duplicate innerbox/outerbox/pallet numbering.
+           Returns: integer count of packaged units for this batch
+        """
+        try:
+            db = mysql.connector.connect(**self.config)
+            cursor = db.cursor()
+            
+            query = """
+                SELECT COUNT(*) as total_units
+                FROM faceware_packaging 
+                WHERE batch_code = %s AND po_num = %s
+            """
+            cursor.execute(query, (batch_code, po_num))
+            result = cursor.fetchone()
+            
+            cursor.close()
+            db.close()
+            
+            if result:
+                count = result[0]
+                print(f"[DB] ✅ Batch '{batch_code}' has {count} units already packaged")
+                return count
+            else:
+                return 0
+                
+        except mysql.connector.Error as err:
+            print(f"[DB ERROR] Failed to count batch units: {err}")
+            return 0  # Return 0 on error to prevent blocking operations
