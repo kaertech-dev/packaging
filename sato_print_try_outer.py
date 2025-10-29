@@ -24,19 +24,19 @@ class LabelPrinterGUI:
         ttk.Label(main_frame, text="SKU:", font=('Arial', 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
         self.sku_entry = ttk.Entry(main_frame, width=40, font=('Arial', 10))
         self.sku_entry.grid(row=1, column=1, pady=5, padx=(10, 0))
-        self.sku_entry.insert(0, "SKU123456")
+        self.sku_entry.insert(0, "43000166102")
         
         # Lot Code
         ttk.Label(main_frame, text="Lot Code:", font=('Arial', 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
         self.lot_entry = ttk.Entry(main_frame, width=40, font=('Arial', 10))
         self.lot_entry.grid(row=2, column=1, pady=5, padx=(10, 0))
-        self.lot_entry.insert(0, "LOT2024001")
+        self.lot_entry.insert(0, "5296C")
         
         # Quantity
         ttk.Label(main_frame, text="Quantity:", font=('Arial', 10)).grid(row=3, column=0, sticky=tk.W, pady=5)
         self.qty_entry = ttk.Entry(main_frame, width=40, font=('Arial', 10))
         self.qty_entry.grid(row=3, column=1, pady=5, padx=(10, 0))
-        self.qty_entry.insert(0, "100")
+        self.qty_entry.insert(0, "10")
         
         # Separator
         ttk.Separator(main_frame, orient='horizontal').grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=20)

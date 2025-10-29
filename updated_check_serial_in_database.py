@@ -1,4 +1,3 @@
-# PACKAGINS/check_serial_in_database.py
 from tkinter import messagebox
 import tkinter as tk
 
@@ -48,33 +47,36 @@ def check_serial_in_db(self):
         pallet_num = existing_data['pallet_num']
         
         msg = (f"ℹ️ Serial '{serial_num}' is already packaged!\n"
-               f"→ Batch Code: {batch_code}\n"
-               f"→ Innerbox: {innerbox_num}\n"
-               f"→ Outerbox: {outerbox_num}\n"
-               f"→ Pallet: {pallet_num}\n")
+            f"→ Batch Code: {batch_code}\n"
+            f"→ Innerbox: {innerbox_num}\n"
+            f"→ Outerbox: {outerbox_num}\n"
+            f"→ Pallet: {pallet_num}\n")
         self.write_to_result_box(msg)
         self.log(msg)
         
-        # Ask user if they want to reprint the inner label
-        reprint = messagebox.askyesno(
-            "Already Packaged - Reprint?",
+        # Ask user what they want to reprint
+        reprint_choice = messagebox.askquestion(
+            "Already Packaged - Reprint Options",
             f"📦 Serial '{serial_num}' is already in the database!\n\n"
             f"Details:\n"
             f"• Batch Code: {batch_code}\n"
             f"• Innerbox: {innerbox_num}\n"
             f"• Outerbox: {outerbox_num}\n"
             f"• Pallet: {pallet_num}\n\n"
-            f"Do you want to reprint the inner label?"
+            f"Do you want to reprint labels?\n\n"
+            f"YES = Inner Label Only\n"
+            f"NO = Show More Options",
+            icon='question'
         )
         
-        if reprint:
-            # Reprint inner label
+        if reprint_choice == 'yes':
+            # Reprint inner label only
             if not self.printer.is_inner_connected():
                 messagebox.showwarning(
                     "Inner Printer Not Connected",
                     "⚠️ Cannot reprint - inner printer is not connected!"
                 )
-                self.log(f"⚠️ Reprint failed - inner printer not connected")
+                self.log(f"⚠️ Inner reprint failed - printer not connected")
             else:
                 from zpl_codes import inner_zpl
                 sku = "43000166102"
@@ -94,45 +96,159 @@ def check_serial_in_db(self):
                 else:
                     self.log(f"❌ REPRINT FAILED: Could not reprint innerbox #{innerbox_num}")
                     messagebox.showerror("Reprint Failed", "❌ Failed to send label to printer.")
+        
         else:
-            self.log(f"ℹ️ User declined reprint for serial {serial_num}")
+            # Show additional reprint options
+            reprint_outer = messagebox.askquestion(
+                "Reprint Options",
+                f"Choose what to reprint:\n\n"
+                f"YES = Outer Label (Box #{outerbox_num})\n"
+                f"NO = Both Inner & Outer Labels",
+                icon='question'
+            )
+            
+            if reprint_outer == 'yes':
+                # Reprint outer label only
+                if not self.printer.is_outer_connected():
+                    messagebox.showwarning(
+                        "Outer Printer Not Connected",
+                        "⚠️ Cannot reprint - outer printer is not connected!"
+                    )
+                    self.log(f"⚠️ Outer reprint failed - printer not connected")
+                else:
+                    from zpl_codes import outer_zpl
+                    sku = "43000166102"
+                    lot_code = batch_code
+                    quantity = self.innerboxes_per_outerbox * self.units_per_innerbox
+                    
+                    outerbox_zpl_data = outer_zpl(sku, lot_code, quantity)
+                    
+                    # Print 2 copies of outer label
+                    self.log(f"🖨️ Reprinting outer label (2 copies) for box #{outerbox_num}...")
+                    first_copy = self.printer.send_to_outer_printer(outerbox_zpl_data)
+                    second_copy = self.printer.send_to_outer_printer(outerbox_zpl_data)
+                    
+                    if first_copy and second_copy:
+                        self.log(f"✅ REPRINT SUCCESS: Outerbox #{outerbox_num} - 2 labels reprinted")
+                        messagebox.showinfo(
+                            "Reprint Success",
+                            f"✅ Outer labels reprinted successfully!\n\n"
+                            f"Outerbox: {outerbox_num}\n"
+                            f"Batch Code: {batch_code}\n"
+                            f"Copies: 2"
+                        )
+                    elif first_copy or second_copy:
+                        self.log(f"⚠️ PARTIAL SUCCESS: Only 1 outer label printed for box #{outerbox_num}")
+                        messagebox.showwarning(
+                            "Partial Success",
+                            f"⚠️ Only 1 outer label was printed.\n\n"
+                            f"Please check printer and try again if needed."
+                        )
+                    else:
+                        self.log(f"❌ REPRINT FAILED: Could not reprint outerbox #{outerbox_num}")
+                        messagebox.showerror("Reprint Failed", "❌ Failed to send labels to printer.")
+            
+            else:
+                # Reprint both inner and outer labels
+                inner_printed = False
+                outer_printed = False
+                
+                # Print inner label
+                if not self.printer.is_inner_connected():
+                    messagebox.showwarning(
+                        "Inner Printer Not Connected",
+                        "⚠️ Inner printer is not connected!\n"
+                        "Will attempt to print outer label only."
+                    )
+                    self.log(f"⚠️ Inner reprint skipped - printer not connected")
+                else:
+                    from zpl_codes import inner_zpl
+                    sku = "43000166102"
+                    barcode = f"{batch_code}-IB{innerbox_num:03d}"
+                    quantity = self.units_per_innerbox
+                    lot = batch_code
+                    innerbox_zpl = inner_zpl(sku, barcode, quantity, lot)
+                    
+                    if self.printer.send_to_inner_printer(innerbox_zpl):
+                        inner_printed = True
+                        self.log(f"✅ REPRINT SUCCESS: Innerbox #{innerbox_num} label reprinted")
+                    else:
+                        self.log(f"❌ Inner reprint failed for box #{innerbox_num}")
+                
+                # Print outer label
+                if not self.printer.is_outer_connected():
+                    messagebox.showwarning(
+                        "Outer Printer Not Connected",
+                        "⚠️ Outer printer is not connected!\n"
+                        f"Inner label: {'✅ Printed' if inner_printed else '❌ Failed'}"
+                    )
+                    self.log(f"⚠️ Outer reprint skipped - printer not connected")
+                else:
+                    from zpl_codes import outer_zpl
+                    sku = "43000166102"
+                    lot_code = batch_code
+                    quantity = self.innerboxes_per_outerbox * self.units_per_innerbox
+                    
+                    outerbox_zpl_data = outer_zpl(sku, lot_code, quantity)
+                    
+                    # Print 2 copies
+                    self.log(f"🖨️ Reprinting outer label (2 copies) for box #{outerbox_num}...")
+                    first_copy = self.printer.send_to_outer_printer(outerbox_zpl_data)
+                    second_copy = self.printer.send_to_outer_printer(outerbox_zpl_data)
+                    
+                    if first_copy and second_copy:
+                        outer_printed = True
+                        self.log(f"✅ REPRINT SUCCESS: Outerbox #{outerbox_num} - 2 labels reprinted")
+                    elif first_copy or second_copy:
+                        outer_printed = True
+                        self.log(f"⚠️ PARTIAL: Only 1 outer label printed for box #{outerbox_num}")
+                    else:
+                        self.log(f"❌ Outer reprint failed for box #{outerbox_num}")
+                
+                # Show final result
+                if inner_printed and outer_printed:
+                    messagebox.showinfo(
+                        "Reprint Success",
+                        f"✅ Both labels reprinted successfully!\n\n"
+                        f"Innerbox: {innerbox_num}\n"
+                        f"Outerbox: {outerbox_num}\n"
+                        f"Batch Code: {batch_code}"
+                    )
+                elif inner_printed or outer_printed:
+                    messagebox.showwarning(
+                        "Partial Success",
+                        f"⚠️ Reprint partially successful:\n\n"
+                        f"Inner Label: {'✅ Printed' if inner_printed else '❌ Failed'}\n"
+                        f"Outer Label: {'✅ Printed' if outer_printed else '❌ Failed'}\n\n"
+                        f"Check printer connections and try again if needed."
+                    )
+                else:
+                    messagebox.showerror(
+                        "Reprint Failed",
+                        "❌ Failed to reprint both labels.\n\n"
+                        "Please check printer connections and try again."
+                    )
         
         # Clear entry and refocus
         self.serial_entry.delete(0, tk.END)
         self.serial_entry.focus()
         return  # Exit here - don't process as new item
 
-    # 5️⃣ Check batch code consistency OR get current pallet for this batch
+    # 5️⃣ Check batch code consistency
     if self.current_pallet_batch_code is None:
-        # New batch code detected - get current pallet for this batch
         self.current_pallet_batch_code = batch_code
-        
-        # 🆕 FETCH CURRENT PALLET NUMBER FROM DATABASE
-        current_pallet, units_in_pallet = self.insert_db.get_current_pallet_for_batch(
-            batch_code, 
-            po_num, 
-            self.total_units_per_pallet
-        )
-        
-        self.pallet_count = current_pallet
-        self.unit_count = units_in_pallet
-        
         self.batch_label.config(
             text=f"Pallet Batch Code: {batch_code}",
             foreground="green"
         )
-        self.log(f"🔒 Batch Code: {batch_code} detected")
-        self.log(f"📦 Current Pallet: {self.pallet_count} (with {self.unit_count} units already)")
-        self.update_progress_display()
-        self.update_batch_count_display(batch_code, po_num)
-        
+        self.log(f"🔒 Pallet {self.pallet_count} locked to Batch Code: {batch_code}")
     elif self.current_pallet_batch_code != batch_code:
         messagebox.showerror(
             "Batch Code Mismatch",
-            f"❌ Cannot add this item to current batch!\n\n"
-            f"Current Batch Code: {self.current_pallet_batch_code}\n"
+            f"❌ Cannot add this item to current pallet!\n\n"
+            f"Current Pallet Batch Code: {self.current_pallet_batch_code}\n"
             f"Scanned Item Batch Code: {batch_code}\n\n"
-            f"All items must have the same batch code.\n\n"
+            f"All items in a pallet must have the same batch code.\n\n"
             f"Click 'New Batch Code' button to start a new batch."
         )
         msg = f"❌ REJECTED: Serial '{serial_num}' has different batch code ({batch_code})\n"
@@ -147,7 +263,8 @@ def check_serial_in_db(self):
     self.write_to_result_box(msg)
     self.log(msg)
     
-    # 7️⃣ FETCH EXISTING COUNT FROM DATABASE FOR THIS BATCH CODE
+    # 🆕 7️⃣ FETCH EXISTING COUNT FROM DATABASE FOR THIS BATCH CODE
+    # This prevents duplicate box numbering by checking how many units already packaged
     existing_count = self.insert_db.get_batch_unit_count(batch_code, po_num)
     self.log(f"📊 Database check: {existing_count} units already packaged for batch {batch_code}")
     
@@ -158,40 +275,6 @@ def check_serial_in_db(self):
     next_unit = existing_count + 1
     current_innerbox = ((next_unit - 1) // self.units_per_innerbox) + 1
     current_outerbox = ((current_innerbox - 1) // self.innerboxes_per_outerbox) + 1
-
-    # 8️⃣ CHECK IF CURRENT PALLET WOULD EXCEED CAPACITY
-    current_pallet_db_count = self.insert_db.get_pallet_unit_count(
-        self.pallet_count, 
-        po_num, 
-        batch_code
-    )
-    total_in_pallet = current_pallet_db_count + 1  # +1 for the item we're about to add
-    
-    self.log(f"🔍 Pallet Capacity Check:")
-    self.log(f"   → Current batch code: {batch_code}")
-    self.log(f"   → Current pallet number: {self.pallet_count}")
-    self.log(f"   → Units already in DB for this pallet: {current_pallet_db_count}")
-    self.log(f"   → Total after adding this unit: {total_in_pallet}")
-    self.log(f"   → Pallet capacity: {self.total_units_per_pallet}")
-    
-    if total_in_pallet > self.total_units_per_pallet:
-        self.log(f"⚠️ PALLET FULL - Moving to next pallet")
-        messagebox.showinfo(
-            "Pallet Full",
-            f"⚠️ Pallet {self.pallet_count} for batch '{batch_code}' is full!\n\n"
-            f"Units in database: {current_pallet_db_count}\n"
-            f"Capacity: {self.total_units_per_pallet}\n\n"
-            f"Moving to pallet {self.pallet_count + 1}..."
-        )
-        
-        # Move to next pallet
-        self.pallet_count += 1
-        self.unit_count = 0
-        self.log(f"📦 Started new pallet: Pallet {self.pallet_count} (Batch: {batch_code})")
-        self.update_progress_display()
-        
-        # Update pallet count for this item
-        current_pallet_db_count = 0  # Reset for new pallet
     
     # 🔍 DEBUG: Log calculation details
     self.log(f"🔍 Box Calculation (Database-based):")
@@ -200,7 +283,7 @@ def check_serial_in_db(self):
     self.log(f"   → Calculated innerbox: {current_innerbox}")
     self.log(f"   → Calculated outerbox: {current_outerbox}")
     
-    # 9️⃣ NOW record to database (after all validations passed)
+    # 8️⃣ NOW record to database (after all validations passed)
     self.log(f"💾 Attempting database insert...")
     success = self.insert_db.record_operator_activity(
         operator=self.username,
@@ -220,14 +303,14 @@ def check_serial_in_db(self):
         self.serial_entry.focus()
         return
     else:
-        self.log(f"✅ Database record successful (Pallet={self.pallet_count}, innerbox={current_innerbox}, outerbox={current_outerbox})")
+        self.log(f"✅ Database record successful (innerbox={current_innerbox}, outerbox={current_outerbox})")
     
-    # 🔟 Update unit count (local counter for progress bar)
+    # 9️⃣ Update unit count (local counter for progress bar)
     self.unit_count += 1
     self.log(f"📊 Local unit count updated: {self.unit_count}/{self.total_units_per_pallet}")
     self.update_progress_display()
 
-    # 1️⃣1️⃣ Print innerbox label when needed (based on DATABASE count, not local count)
+    # 🔟 Print innerbox label when needed (based on DATABASE count, not local count)
     innerbox_printed = False
     self.log(f"🔍 Innerbox Check: {next_unit} % {self.units_per_innerbox} = {next_unit % self.units_per_innerbox}")
     
@@ -259,7 +342,7 @@ def check_serial_in_db(self):
         remaining = self.units_per_innerbox - (next_unit % self.units_per_innerbox)
         self.log(f"ℹ️ Not time for innerbox yet (need {remaining} more units)")
     
-    # 1️⃣2️⃣ Print outerbox label when needed (based on DATABASE count)
+    # 1️⃣1️⃣ Print outerbox label when needed (based on DATABASE count)
     outerbox_printed = False
     units_per_outerbox = self.units_per_innerbox * self.innerboxes_per_outerbox
     
@@ -319,7 +402,7 @@ def check_serial_in_db(self):
         remaining_units = units_per_outerbox - (next_unit % units_per_outerbox)
         self.log(f"ℹ️ Not time for outerbox yet (need {remaining_units} more units)")
 
-    # 1️⃣3️⃣ Update database status after successful processing
+    # 1️⃣2️⃣ Update database status after successful processing
     self.log(f"💾 Updating packaging status in database...")
     db_update_success = self.insert_db.update_packaging_status(serial_num, po_num, batch_code)
     
@@ -328,21 +411,26 @@ def check_serial_in_db(self):
     else:
         self.log(f"⚠️ Warning: Failed to update packaging status in database")
 
-    # 1️⃣4️⃣ Check if pallet is complete
+    # 1️⃣3️⃣ Check if pallet is complete
     if self.unit_count >= self.total_units_per_pallet:
         messagebox.showinfo(
             "Pallet Complete", 
             f"🎉 Pallet {self.pallet_count} is complete!\n"
             f"Batch Code: {self.current_pallet_batch_code}\n"
-            f"Total units: {self.unit_count}\n\n"
-            f"Moving to pallet {self.pallet_count + 1}..."
+            f"Total units: {self.unit_count}\n"
+            f"Starting new pallet..."
         )
-        self.log(f"🎉 PALLET {self.pallet_count} COMPLETED (Batch: {batch_code}) - Moving to next pallet")
+        self.log(f"🎉 PALLET {self.pallet_count} COMPLETED - Starting new pallet")
         self.pallet_count += 1
         self.unit_count = 0
+        self.current_pallet_batch_code = None
+        self.batch_label.config(
+            text="Batch Code: Not Set",
+            foreground="orange"
+        )
         self.update_progress_display()
     
-    # 1️⃣5️⃣ Clear entry and refocus
+    # 1️⃣4️⃣ Clear entry and refocus
     self.serial_entry.delete(0, tk.END)
     self.serial_entry.focus()
     

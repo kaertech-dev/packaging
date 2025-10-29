@@ -3,8 +3,6 @@ from tkinter import ttk, messagebox, scrolledtext
 import serial
 import serial.tools.list_ports
 import mysql.connector
-from zpl_codes import zpl_code
-
 class ZPLPrinterGUI:
     def __init__(self, root):
         self.root = root

@@ -3,7 +3,6 @@ from tkinter import ttk, scrolledtext
 from PIL import Image, ImageTk
 import tkinter as tk
 from widget_design import add_tooltip
-from check_serial_in_database import check_serial_in_db
 
 def create_widgets(self):
         """Create all UI widgets"""
@@ -78,13 +77,27 @@ def create_widgets(self):
         )
         self.connect_btn.pack(pady=3)
 
+        # --- NEW: Total Units Scanned Display ---
+        total_units_frame = ttk.LabelFrame(left_conn, text="Production Summary", padding=8)
+        total_units_frame.pack(fill="x", pady=(5, 0))
+
+        self.total_units_label = ttk.Label(
+            total_units_frame,
+            text="Total Units Scanned: --",
+            font=("Arial", 10, "bold"),
+            foreground="#006400"
+        )
+        self.total_units_label.pack(pady=2)
+
+        add_tooltip(self.total_units_label, "Total units packaged - updates automatically every 10 seconds")
+        
         # --- RIGHT SIDE: Logo + User Info + Logout + Pallet Progress ---
         right_conn = ttk.Frame(conn_frame)
         right_conn.pack(side="right", anchor="ne", padx=(0, 10), pady=(10, 0))
 
         # 🖼 Load image + user info container
         try:
-            logo_image = Image.open("kaertech_logo512.png")
+            logo_image = Image.open("packagins/kaertech_logo512.png")
             logo_image = logo_image.resize((110, 110))
             self.logo_photo = ImageTk.PhotoImage(logo_image)
 
@@ -152,6 +165,16 @@ def create_widgets(self):
         )
         self.unit_label.pack(pady=2)
 
+        # ✅ NEW: Database batch count display
+        self.batch_count_label = ttk.Label(
+            self.progress_frame,
+            text="DB Batch Count: --",
+            font=("Arial", 9),
+            foreground="#0066CC"
+        )
+        self.batch_count_label.pack(pady=2)
+        add_tooltip(self.batch_count_label, "Total units already packaged for current batch code in database")
+
         # ✅ Batch code display with clear button
         batch_frame = ttk.Frame(self.progress_frame)
         batch_frame.pack(pady=5)
@@ -186,6 +209,17 @@ def create_widgets(self):
         )
         self.new_batch_btn.pack(side="left", padx=2)
         add_tooltip(self.new_batch_btn, "Finish current batch and start new one with different batch code")
+
+        # ✅ NEW: Refresh batch count button
+        refresh_batch_btn = ttk.Button(
+            batch_frame,
+            text="🔄 Refresh Batch Count",
+            command=self.refresh_batch_count,
+            style="Refresh.TButton",
+            width=20
+        )
+        refresh_batch_btn.pack(pady=2)
+        add_tooltip(refresh_batch_btn, "Manually refresh the database batch count")
 
         self.progress_bar = ttk.Progressbar(self.progress_frame, length=250, mode='determinate')
         self.progress_bar.pack(pady=(5, 10))
