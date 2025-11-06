@@ -173,9 +173,15 @@ class insertDatabaseHandler:
         except mysql.connector.Error as err:
             print(f"[DB ERROR] Failed to update packaging status: {err}")
             return False
+
     
     def check_existing_packaging(self, serial_num, po_num, batch_code):
         """Check if serial_num already exists in faceware_packagingryan.
+           Returns packaging data if found, None otherwise.
+        """
+    def check_existing_packaging(self, serial_num, po_num, batch_code):
+        """Check if serial_num already exists in faceware_packaging.
+
            Returns packaging data if found, None otherwise.
         """
         try:
@@ -185,6 +191,8 @@ class insertDatabaseHandler:
             query = """
                 SELECT serial_num, batch_code, innerbox, outerbox, pallet_num, operator_en, date_time
                 FROM faceware_packagingryan
+                FROM faceware_packaging 
+
                 WHERE serial_num = %s AND po_num = %s AND batch_code = %s
                 LIMIT 1
             """
@@ -215,7 +223,11 @@ class insertDatabaseHandler:
             
             query = """
                 SELECT COUNT(*) as total_units
+
                 FROM faceware_packagingryan
+
+                FROM faceware_packaging 
+
                 WHERE batch_code = %s AND po_num = %s
             """
             cursor.execute(query, (batch_code, po_num))
@@ -357,3 +369,5 @@ class insertDatabaseHandler:
         except mysql.connector.Error as err:
             print(f"[DB ERROR] Failed to count pallet units: {err}")
             return 0  # Return 0 on error
+            return 0  # Return 0 on error to prevent blocking operations
+

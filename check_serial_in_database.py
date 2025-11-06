@@ -103,6 +103,7 @@ def check_serial_in_db(self):
         return  # Exit here - don't process as new item
 
     # 5️⃣ Check batch code consistency OR get current pallet for this batch
+    # 5️⃣ Check batch code consistency
     if self.current_pallet_batch_code is None:
         # New batch code detected - get current pallet for this batch
         self.current_pallet_batch_code = batch_code
@@ -147,7 +148,11 @@ def check_serial_in_db(self):
     self.write_to_result_box(msg)
     self.log(msg)
     
+
     # 7️⃣ FETCH EXISTING COUNT FROM DATABASE FOR THIS BATCH CODE
+
+    # 🆕 7️⃣ FETCH EXISTING COUNT FROM DATABASE FOR THIS BATCH CODE
+    # This prevents duplicate box numbering by checking how many units already packaged
     existing_count = self.insert_db.get_batch_unit_count(batch_code, po_num)
     self.log(f"📊 Database check: {existing_count} units already packaged for batch {batch_code}")
     
@@ -222,12 +227,20 @@ def check_serial_in_db(self):
     else:
         self.log(f"✅ Database record successful (Pallet={self.pallet_count}, innerbox={current_innerbox}, outerbox={current_outerbox})")
     
+
     # 🔟 Update unit count (local counter for progress bar)
+
+    # 9️⃣ Update unit count (local counter for progress bar)
+
     self.unit_count += 1
     self.log(f"📊 Local unit count updated: {self.unit_count}/{self.total_units_per_pallet}")
     self.update_progress_display()
 
+
     # 1️⃣1️⃣ Print innerbox label when needed (based on DATABASE count, not local count)
+
+    # 🔟 Print innerbox label when needed (based on DATABASE count, not local count)
+
     innerbox_printed = False
     self.log(f"🔍 Innerbox Check: {next_unit} % {self.units_per_innerbox} = {next_unit % self.units_per_innerbox}")
     
@@ -259,8 +272,8 @@ def check_serial_in_db(self):
         remaining = self.units_per_innerbox - (next_unit % self.units_per_innerbox)
         self.log(f"ℹ️ Not time for innerbox yet (need {remaining} more units)")
     
+
     # 1️⃣2️⃣ Print outerbox label when needed (based on DATABASE count)
-    outerbox_printed = False
     units_per_outerbox = self.units_per_innerbox * self.innerboxes_per_outerbox
     
     # Debug logging for outerbox

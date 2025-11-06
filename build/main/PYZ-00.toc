@@ -1,4 +1,4 @@
-('C:\\Users\\cadetautomation\\Documents\\packagins\\build\\main\\PYZ-00.pyz',
+('C:\\Users\\cadetautomation\\Desktop\\updated_packaging\\packagins\\build\\main\\PYZ-00.pyz',
  [('_compat_pickle',
    'C:\\Users\\cadetautomation\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\_compat_pickle.py',
    'PYMODULE'),
