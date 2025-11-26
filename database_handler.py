@@ -7,8 +7,8 @@ class DatabaseHandler:
     def __init__(self):
         self.config = {
             'host': '192.168.1.38',
-            'user': 'testing',
-            'password': 'testing',
+            'user': 'readonly_use',
+            'password': 'kts@tsd2025',
             'database': 'ledtech'
         }
 
