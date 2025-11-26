@@ -7,7 +7,7 @@ class DatabaseHandler:
     def __init__(self):
         self.config = {
             'host': '192.168.1.38',
-            'user': 'readonly_use',
+            'user': 'readonly_user',
             'password': 'kts@tsd2025',
             'database': 'ledtech'
         }
@@ -33,8 +33,8 @@ class insertDatabaseHandler:
     def __init__(self):
         self.config = {
             'host': '192.168.1.38',
-            'user': 'testing',
-            'password': 'testing',
+            'user': 'readonly_user',
+            'password': 'kts@testing2025',
             'database': 'ledtech'
         }
 
