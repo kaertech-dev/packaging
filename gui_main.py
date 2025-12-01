@@ -8,6 +8,7 @@ from gui_main_widget import create_widgets
 from select_shipping_mode_ui import show_ship_mode_dialog
 from check_serial_in_database import check_serial_in_db
 from types import MethodType
+from check_serial_in_database import check_serial_in_db, show_batch_selection_dialog, _switch_to_batch
 
 class ZPLPrinterGUI:
     def __init__(self, root, username, serial_num, po_num, shift, ship_mode, logout_callback):
@@ -40,6 +41,9 @@ class ZPLPrinterGUI:
         self.printer = PrinterHandler()
         self.db = DatabaseHandler()
         self.check_serial_in_db = MethodType(check_serial_in_db, self)
+        self.check_serial_in_db = MethodType(check_serial_in_db, self)
+        self.show_batch_selection_dialog = MethodType(show_batch_selection_dialog, self)
+        self._switch_to_batch = MethodType(_switch_to_batch, self)
         apply_widget_styles()
         create_widgets(self)
         self.refresh_ports()
@@ -464,7 +468,6 @@ class ZPLPrinterGUI:
             f"Batch Code: {self.current_pallet_batch_code}\n"
             f"Total Units in DB: {existing_count}"
         )
-        
     def auto_refresh_total_units(self):
         """Automatically refresh total units every 10 seconds"""
         self.update_total_units_display()
@@ -502,54 +505,6 @@ class ZPLPrinterGUI:
             foreground="#0066CC"
         )
         self.log(f"📊 Batch count display updated: {existing_count} units for batch '{batch_code}'")
-
-    def update_batch_count_display(self, batch_code=None, po_num=None):
-        """Update the batch count label with database count"""
-        if batch_code is None:
-            batch_code = self.current_pallet_batch_code
-        if po_num is None:
-            po_num = self.po_num
-            
-        if batch_code is None:
-            self.batch_count_label.config(
-                text="DB Batch Count: --",
-                foreground="gray"
-            )
-            return
-        
-        # Fetch current count from database
-        existing_count = self.insert_db.get_batch_unit_count(batch_code, po_num)
-        
-        # Update label
-        self.batch_count_label.config(
-            text=f"DB Batch Count: {existing_count} units",
-            foreground="#0066CC"
-        )
-        
-        self.log(f"📊 Batch count display updated: {existing_count} units for batch '{batch_code}'")
-
-    # ✅ EXISTING METHODS CONTINUE BELOW
-    def write_to_result_box(self, text):
-        """Write text to the result box (handles read-only state)"""
-        self.result_box.config(state='normal')
-        self.result_box.insert("end", text)
-        self.result_box.see("end")
-        self.result_box.config(state='disabled')
-
-    def clear_result_box(self):
-        """Clear the barcode scanning result box"""
-        self.result_box.config(state='normal')
-        self.result_box.delete("1.0", tk.END)
-        self.result_box.insert("1.0", "→ Waiting for scan...\n")
-        self.result_box.config(state='disabled')
-        self.log("Result box cleared")
-
-    def clear_log(self):
-        """Clear the log text box"""
-        if messagebox.askyesno("Clear Log", "Are you sure you want to clear the log?"):
-            self.log_text.config(state='normal')
-            self.log_text.delete("1.0", tk.END)
-            self.log_text.config(state='disabled')
 
     # ✅ EXISTING METHODS CONTINUE BELOW
     def log(self, msg):

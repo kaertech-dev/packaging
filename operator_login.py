@@ -49,7 +49,7 @@ class OperatorLogin:
         create_green_header(
             self.root,
             text="Operator Login",
-            image_path=r"C:\Users\cadetautomation\Desktop\updated_packaging\packagins\kaertech_logo512.png",  # 👈 your image path
+            image_path=r"C:\Users\production\Desktop\updated_packaging\packagins\kaertech_logo512.png",  # 👈 your image path
             img_size=(40, 40)
         )
         #tk.Label(self.root, text="Operator Login", font=("Arial", 16, "bold")).pack(pady=10)
@@ -120,7 +120,7 @@ class OperatorLogin:
         create_green_header(
             self.root,
             text="Shipping Mode Selection",
-            image_path=r"C:\Users\cadetautomation\Desktop\updated_packaging\packagins\kaertech_logo512.png",
+            image_path=r"C:\Users\ai\Documents\packaging\packaging\kaertech_logo512.png",
             img_size=(40, 40)
         )
 

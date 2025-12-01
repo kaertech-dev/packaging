@@ -97,7 +97,7 @@ def create_widgets(self):
 
         # 🖼 Load image + user info container
         try:
-            logo_image = Image.open("packagins/kaertech_logo512.png")
+            logo_image = Image.open(r"C:\Users\ai\Documents\packaging\packaging\kaertech_logo512.png")
             logo_image = logo_image.resize((110, 110))
             self.logo_photo = ImageTk.PhotoImage(logo_image)
 
@@ -190,15 +190,16 @@ def create_widgets(self):
         button_row1 = ttk.Frame(batch_frame)
         button_row1.pack(pady=2)
         
-        clear_batch_btn = ttk.Button(
+        # NEW CODE - USE THIS INSTEAD:
+        change_batch_btn = ttk.Button(
             button_row1,
-            text="Clear Batch",
-            command=self.clear_batch_code,
+            text="Change Batch",
+            command=self.show_batch_selection_dialog,
             style="Refresh.TButton",
             width=12
         )
-        clear_batch_btn.pack(side="left", padx=2)
-        add_tooltip(clear_batch_btn, "Clear the current pallet batch code lock")
+        change_batch_btn.pack(side="left", padx=2)
+        add_tooltip(change_batch_btn, "Switch to a different unfinished batch code")
 
         self.new_batch_btn = ttk.Button(
             button_row1,

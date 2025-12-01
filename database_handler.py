@@ -1,5 +1,5 @@
 # PACKAGING/database_handler.py
-import mysql.connector
+import pymysql
 from datetime import datetime
 from tkinter import messagebox
 
@@ -7,15 +7,15 @@ class DatabaseHandler:
     def __init__(self):
         self.config = {
             'host': '192.168.1.38',
-            'user': 'readonly_user',
-            'password': 'kts@tsd2025',
+            'user': 'labeling',
+            'password': 'labeling',
             'database': 'ledtech'
         }
 
     def get_batch_and_po(self, serial_num):
         """Fetch batch_code and po_num from faceware_assembly1 if serial exists."""
         try:
-            db = mysql.connector.connect(**self.config)
+            db = pymysql.connect(**self.config)
             cursor = db.cursor()
             cursor.execute("SELECT batch_code, po_num FROM faceware_assembly1 WHERE serial_num = %s", (serial_num,))
             result = cursor.fetchone()
@@ -25,7 +25,7 @@ class DatabaseHandler:
                 return result[0], result[1]
             else:
                 return None, None
-        except mysql.connector.Error as err:
+        except pymysql.Error as err:
             print(f"[DB ERROR] {err}")
             return None, None
 
@@ -33,8 +33,8 @@ class insertDatabaseHandler:
     def __init__(self):
         self.config = {
             'host': '192.168.1.38',
-            'user': 'readonly_user',
-            'password': 'kts@testing2025',
+            'user': 'labeling',
+            'password': 'labeling',
             'database': 'ledtech'
         }
 
@@ -44,8 +44,8 @@ class insertDatabaseHandler:
            Checks if serial_num passed all production stations before packaging.
         """
         try:
-            db = mysql.connector.connect(**self.config)
-            cursor = db.cursor(dictionary=True)
+            db = pymysql.connect(**self.config)
+            cursor = db.cursor(pymysql.cursors.DictCursor)
 
             # ✅ Step 1: Verify serial exists in faceware_main
             cursor.execute("SELECT * FROM faceware_main WHERE serial_num = %s", (serial_num,))
@@ -97,7 +97,7 @@ class insertDatabaseHandler:
 
             # ✅ Step 4: Prevent duplicate packaging entries
             check_query = """
-                SELECT COUNT(*) AS cnt FROM faceware_packagingryan 
+                SELECT COUNT(*) AS cnt FROM faceware_packaging 
                 WHERE serial_num = %s AND po_num = %s AND batch_code = %s
             """
             cursor.execute(check_query, (serial_num, po_num, batch_code))
@@ -111,7 +111,7 @@ class insertDatabaseHandler:
             # ✅ Step 5: Insert new packaging record
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             insert_query = """
-                INSERT INTO faceware_packagingryan
+                INSERT INTO faceware_packaging 
                 (serial_num, po_num, operator_en, shift, date_time, sku, batch_code, 
                  ship_mode, innerbox, outerbox, pallet_num)
                 VALUES (%s, %s, %s, %s, %s, 43000166102, %s, %s, %s, %s, %s)
@@ -129,17 +129,17 @@ class insertDatabaseHandler:
             db.close()
             return True
 
-        except mysql.connector.Error as err:
+        except pymysql.Error as err:
             print(f"[DB ERROR] {err}")
             messagebox.showerror("Database Error", f"⚠️ Database error occurred:\n{err}")
             return False
 
     def update_packaging_status(self, serial_num, po_num, batch_code):
-        """Update faceware_main.packaging = 1 and faceware_packagingryan.status = 1 
+        """Update faceware_main.packaging = 1 and faceware_packaging.status = 1 
            after successful label printing.
         """
         try:
-            db = mysql.connector.connect(**self.config)
+            db = pymysql.connect(**self.config)
             cursor = db.cursor()
 
             # ✅ Update faceware_main: Set packaging = 1
@@ -149,11 +149,11 @@ class insertDatabaseHandler:
                 WHERE serial_num = %s
             """
             cursor.execute(update_main_query, (serial_num,))
-
-            # ✅ Update faceware_packagingryan: Set status = 1
+            
+            # ✅ Update faceware_packaging: Set status = 1
             update_packaging_query = """
-                UPDATE faceware_packagingryan
-                SET status = 1
+                UPDATE faceware_packaging 
+                SET status = 1 
                 WHERE serial_num = %s AND po_num = %s AND batch_code = %s
             """
             cursor.execute(update_packaging_query, (serial_num, po_num, batch_code))
@@ -162,7 +162,7 @@ class insertDatabaseHandler:
             
             rows_affected_main = cursor.rowcount
             print(f"[DB] ✅ Updated packaging status: "
-                  f"faceware_main.packaging=1, faceware_packagingryan.status=1 "
+                  f"faceware_main.packaging=1, faceware_packaging.status=1 "
                   f"for serial {serial_num}")
 
             cursor.close()
@@ -170,29 +170,20 @@ class insertDatabaseHandler:
             
             return True
 
-        except mysql.connector.Error as err:
+        except pymysql.Error as err:
             print(f"[DB ERROR] Failed to update packaging status: {err}")
             return False
-
-    
-    def check_existing_packaging(self, serial_num, po_num, batch_code):
-        """Check if serial_num already exists in faceware_packagingryan.
-           Returns packaging data if found, None otherwise.
-        """
     def check_existing_packaging(self, serial_num, po_num, batch_code):
         """Check if serial_num already exists in faceware_packaging.
-
            Returns packaging data if found, None otherwise.
         """
         try:
-            db = mysql.connector.connect(**self.config)
-            cursor = db.cursor(dictionary=True)
+            db = pymysql.connect(**self.config)
+            cursor = db.cursor(pymysql.cursors.DictCursor)
             
             query = """
                 SELECT serial_num, batch_code, innerbox, outerbox, pallet_num, operator_en, date_time
-                FROM faceware_packagingryan
                 FROM faceware_packaging 
-
                 WHERE serial_num = %s AND po_num = %s AND batch_code = %s
                 LIMIT 1
             """
@@ -208,7 +199,7 @@ class insertDatabaseHandler:
             else:
                 return None
                 
-        except mysql.connector.Error as err:
+        except pymysql.Error as err:
             print(f"[DB ERROR] Failed to check existing packaging: {err}")
             return None
 
@@ -218,16 +209,12 @@ class insertDatabaseHandler:
            Returns: integer count of packaged units for this batch
         """
         try:
-            db = mysql.connector.connect(**self.config)
+            db = pymysql.connect(**self.config)
             cursor = db.cursor()
             
             query = """
                 SELECT COUNT(*) as total_units
-
-                FROM faceware_packagingryan
-
                 FROM faceware_packaging 
-
                 WHERE batch_code = %s AND po_num = %s
             """
             cursor.execute(query, (batch_code, po_num))
@@ -243,21 +230,21 @@ class insertDatabaseHandler:
             else:
                 return 0
                 
-        except mysql.connector.Error as err:
+        except pymysql.Error as err:
             print(f"[DB ERROR] Failed to count batch units: {err}")
             return 0  # Return 0 on error to prevent blocking operations
     
     def get_total_packaged_units(self):
-        """Get total count of all units in faceware_packagingryan table.
+        """Get total count of all units in faceware_packaging table.
         Returns: integer count of all packaged units
         """
         try:
-            db = mysql.connector.connect(**self.config)
+            db = pymysql.connect(**self.config)
             cursor = db.cursor()
             
             query = """
                 SELECT COUNT(*) as total_units
-                FROM faceware_packagingryan
+                FROM faceware_packaging
             """
             cursor.execute(query)
             result = cursor.fetchone()
@@ -272,88 +259,24 @@ class insertDatabaseHandler:
             else:
                 return 0
                 
-        except mysql.connector.Error as err:
+        except pymysql.Error as err:
             print(f"[DB ERROR] Failed to count total units: {err}")
             return 0  # Return 0 on error
     
-    def get_current_pallet_for_batch(self, batch_code, po_num, total_units_per_pallet):
-        """Get the current pallet number for a batch code.
-           Returns: (pallet_num, units_in_pallet)
-           - pallet_num: Current pallet number for this batch
-           - units_in_pallet: Number of units already in the current pallet
-        """
-        try:
-            db = mysql.connector.connect(**self.config)
-            cursor = db.cursor(dictionary=True)
-            
-            # Get the highest pallet number for this batch
-            query = """
-                SELECT MAX(pallet_num) as max_pallet
-                FROM faceware_packagingryan
-                WHERE batch_code = %s AND po_num = %s
-            """
-            cursor.execute(query, (batch_code, po_num))
-            result = cursor.fetchone()
-            
-            if result and result['max_pallet'] is not None:
-                current_pallet = result['max_pallet']
-                
-                # Count units in the current pallet
-                count_query = """
-                    SELECT COUNT(*) as unit_count
-                    FROM faceware_packagingryan
-                    WHERE batch_code = %s AND po_num = %s AND pallet_num = %s
-                """
-                cursor.execute(count_query, (batch_code, po_num, current_pallet))
-                count_result = cursor.fetchone()
-                units_in_pallet = count_result['unit_count'] if count_result else 0
-                
-                # Check if current pallet is full
-                if units_in_pallet >= total_units_per_pallet:
-                    # Current pallet is full, move to next pallet
-                    current_pallet += 1
-                    units_in_pallet = 0
-                    print(f"[DB] ✅ Batch '{batch_code}' pallet {current_pallet - 1} is full. Moving to pallet {current_pallet}")
-                else:
-                    print(f"[DB] ✅ Batch '{batch_code}' continuing on pallet {current_pallet} ({units_in_pallet} units)")
-                
-                cursor.close()
-                db.close()
-                return current_pallet, units_in_pallet
-            else:
-                # No existing pallets for this batch, start with pallet 1
-                cursor.close()
-                db.close()
-                print(f"[DB] ✅ Batch '{batch_code}' starting new - Pallet 1")
-                return 1, 0
-                
-        except mysql.connector.Error as err:
-            print(f"[DB ERROR] Failed to get current pallet: {err}")
-            return 1, 0  # Default to pallet 1 on error
-    
-    def get_pallet_unit_count(self, pallet_num, po_num, batch_code=None):
+    def get_pallet_unit_count(self, pallet_num, po_num):
         """Count how many units are already in a specific pallet number.
         Returns: integer count of units in this pallet
         """
         try:
-            db = mysql.connector.connect(**self.config)
+            db = pymysql.connect(**self.config)
             cursor = db.cursor()
             
-            if batch_code:
-                query = """
-                    SELECT COUNT(*) as total_units
-                    FROM faceware_packagingryan
-                    WHERE pallet_num = %s AND po_num = %s AND batch_code = %s
-                """
-                cursor.execute(query, (pallet_num, po_num, batch_code))
-            else:
-                query = """
-                    SELECT COUNT(*) as total_units
-                    FROM faceware_packagingryan
-                    WHERE pallet_num = %s AND po_num = %s
-                """
-                cursor.execute(query, (pallet_num, po_num))
-            
+            query = """
+                SELECT COUNT(*) as total_units
+                FROM faceware_packaging 
+                WHERE pallet_num = %s AND po_num = %s
+            """
+            cursor.execute(query, (pallet_num, po_num))
             result = cursor.fetchone()
             
             cursor.close()
@@ -366,8 +289,82 @@ class insertDatabaseHandler:
             else:
                 return 0
                 
-        except mysql.connector.Error as err:
+        except pymysql.Error as err:
             print(f"[DB ERROR] Failed to count pallet units: {err}")
-            return 0  # Return 0 on error
-            return 0  # Return 0 on error to prevent blocking operations
+            return 0 # Return 0 on error
+    # ...existing code...
 
+    def get_unfinished_batches(self):
+        """Return list of unfinished batches with simple stats."""
+        try:
+            query = """
+            SELECT batch_code, po_num, pallet_num, COUNT(*) AS unit_count
+            FROM operator_activity
+            WHERE packaging = 0
+            GROUP BY batch_code, po_num, pallet_num
+            ORDER BY batch_code DESC;
+            """
+            self.cursor.execute(query)
+            rows = self.cursor.fetchall()
+            return [{'batch_code': r[0], 'po_num': r[1], 'pallet_num': r[2], 'unit_count': r[3]} for r in rows]
+        except Exception as e:
+            print("get_unfinished_batches error:", e)
+            return []
+
+    def get_batch_info(self, batch_code):
+        """Return aggregated info for a batch_code."""
+        try:
+            query = """
+            SELECT batch_code, po_num, pallet_num, COUNT(*) AS unit_count
+            FROM operator_activity
+            WHERE batch_code = %s
+            GROUP BY batch_code, po_num, pallet_num;
+            """
+            self.cursor.execute(query, (batch_code,))
+            r = self.cursor.fetchone()
+            if not r:
+                return None
+            return {'batch_code': r[0], 'po_num': r[1], 'pallet_num': r[2], 'unit_count': r[3]}
+        except Exception as e:
+            print("get_batch_info error:", e)
+            return None
+
+    # Add this method to the insertDatabaseHandler class in database_handler.py
+
+    def get_unfinished_batches(self):
+        """Return list of unfinished batches with their statistics.
+        Returns batches that haven't completed their pallet capacity.
+        """
+        try:
+            db = pymysql.connect(**self.config)
+            cursor = db.cursor(pymysql.cursors.DictCursor)
+            
+            # Query to get batch information grouped by batch_code and pallet_num
+            query = """
+                SELECT 
+                    batch_code,
+                    po_num,
+                    pallet_num,
+                    COUNT(*) as unit_count,
+                    MAX(date_time) as last_updated
+                FROM faceware_packaging
+                GROUP BY batch_code, po_num, pallet_num
+                ORDER BY last_updated DESC, batch_code DESC
+            """
+            
+            cursor.execute(query)
+            results = cursor.fetchall()
+            
+            cursor.close()
+            db.close()
+            
+            if results:
+                print(f"[DB] Found {len(results)} batch/pallet combinations")
+                return results
+            else:
+                print("[DB] No unfinished batches found")
+                return []
+                
+        except pymysql.Error as err:
+            print(f"[DB ERROR] get_unfinished_batches: {err}")
+            return []
